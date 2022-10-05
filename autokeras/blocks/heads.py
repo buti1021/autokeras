@@ -15,10 +15,11 @@
 from typing import Optional
 
 import tensorflow as tf
+from tensorflow import keras
+from tensorflow import nest
 from tensorflow.keras import activations
 from tensorflow.keras import layers
 from tensorflow.keras import losses
-from tensorflow.python.util import nest
 
 from autokeras import adapters
 from autokeras import analysers
@@ -115,7 +116,7 @@ class ClassificationHead(head_module.Head):
         if dropout > 0:
             output_node = layers.Dropout(dropout)(output_node)
         output_node = layers.Dense(self.shape[-1])(output_node)
-        if isinstance(self.loss, tf.keras.losses.BinaryCrossentropy):
+        if isinstance(self.loss, keras.losses.BinaryCrossentropy):
             output_node = layers.Activation(activations.sigmoid, name=self.name)(
                 output_node
             )
@@ -228,7 +229,10 @@ class RegressionHead(head_module.Head):
         input_node = inputs[0]
         output_node = input_node
 
-        dropout = self.dropout or hp.Choice("dropout", [0.0, 0.25, 0.5], default=0)
+        if self.dropout is not None:
+            dropout = self.dropout
+        else:
+            dropout = hp.Choice("dropout", [0.0, 0.25, 0.5], default=0)
 
         if dropout > 0:
             output_node = layers.Dropout(dropout)(output_node)

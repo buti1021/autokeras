@@ -13,11 +13,12 @@
 # limitations under the License.
 
 import re
+import warnings
 
-import kerastuner
+import keras_tuner
 import tensorflow as tf
 from packaging.version import parse
-from tensorflow.python.util import nest
+from tensorflow import nest
 
 
 def validate_num_inputs(inputs, num):
@@ -36,26 +37,26 @@ def to_snake_case(name):
 
 
 def check_tf_version() -> None:
-    if parse(tf.__version__) < parse("2.3.0"):
-        raise ImportError(
-            "The Tensorflow package version needs to be at least 2.3.0 \n"
+    if parse(tf.__version__) < parse("2.7.0"):
+        warnings.warn(
+            "The Tensorflow package version needs to be at least 2.7.0 \n"
             "for AutoKeras to run. Currently, your TensorFlow version is \n"
-            "{version}. Please upgrade with \n"
+            f"{tf.__version__}. Please upgrade with \n"
             "`$ pip install --upgrade tensorflow`. \n"
-            "You can use `pip freeze` to check afterwards that everything is "
-            "ok.".format(version=tf.__version__)
+            "You can use `pip freeze` to check afterwards that everything is ok.",
+            ImportWarning,
         )
 
 
 def check_kt_version() -> None:
-    if parse(kerastuner.__version__) < parse("1.0.2"):
-        raise ImportError(
-            "The Keras Tuner package version needs to be at least 1.0.2 \n"
+    if parse(keras_tuner.__version__) < parse("1.1.0"):
+        warnings.warn(
+            "The Keras Tuner package version needs to be at least 1.1.0 \n"
             "for AutoKeras to run. Currently, your Keras Tuner version is \n"
-            "{version}. Please upgrade with \n"
+            f"{keras_tuner.__version__}. Please upgrade with \n"
             "`$ pip install --upgrade keras-tuner`. \n"
-            "You can use `pip freeze` to check afterwards that everything is "
-            "ok.".format(version=kerastuner.__version__)
+            "You can use `pip freeze` to check afterwards that everything is ok.",
+            ImportWarning,
         )
 
 
@@ -63,19 +64,23 @@ def contain_instance(instance_list, instance_type):
     return any([isinstance(instance, instance_type) for instance in instance_list])
 
 
-def evaluate_with_adaptive_batch_size(model, batch_size, **fit_kwargs):
+def evaluate_with_adaptive_batch_size(model, batch_size, verbose=1, **fit_kwargs):
     return run_with_adaptive_batch_size(
         batch_size,
-        lambda x, validation_data, **kwargs: model.evaluate(x, **kwargs),
-        **fit_kwargs
+        lambda x, validation_data, **kwargs: model.evaluate(
+            x, verbose=verbose, **kwargs
+        ),
+        **fit_kwargs,
     )
 
 
-def predict_with_adaptive_batch_size(model, batch_size, **fit_kwargs):
+def predict_with_adaptive_batch_size(model, batch_size, verbose=1, **fit_kwargs):
     return run_with_adaptive_batch_size(
         batch_size,
-        lambda x, validation_data, **kwargs: model.predict(x, **kwargs),
-        **fit_kwargs
+        lambda x, validation_data, **kwargs: model.predict(
+            x, verbose=verbose, **kwargs
+        ),
+        **fit_kwargs,
     )
 
 
@@ -120,10 +125,10 @@ def add_to_hp(hp, hps, name=None):
     """Add the HyperParameter (self) to the HyperParameters.
 
     # Arguments
-        hp: kerastuner.HyperParameters.
+        hp: keras_tuner.HyperParameters.
         name: String. If left unspecified, the hp name is used.
     """
-    if not isinstance(hp, kerastuner.engine.hyperparameters.HyperParameter):
+    if not isinstance(hp, keras_tuner.engine.hyperparameters.HyperParameter):
         return hp
     kwargs = hp.get_config()
     if name is None:

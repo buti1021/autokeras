@@ -16,14 +16,16 @@ from typing import Optional
 from typing import Union
 
 import tensorflow as tf
-from kerastuner.engine import hyperparameters
+from keras_tuner.engine import hyperparameters
+from tensorflow import keras
+from tensorflow import nest
 from tensorflow.keras import applications
 from tensorflow.keras import layers
-from tensorflow.python.util import nest
 
 from autokeras import keras_layers
 from autokeras.blocks import reduction
 from autokeras.engine import block as block_module
+from autokeras.utils import io_utils
 from autokeras.utils import layer_utils
 from autokeras.utils import utils
 
@@ -57,15 +59,15 @@ class DenseBlock(block_module.Block):
     """Block for Dense layers.
 
     # Arguments
-        num_layers: Int or kerastuner.engine.hyperparameters.Choice.
+        num_layers: Int or keras_tuner.engine.hyperparameters.Choice.
             The number of Dense layers in the block.
             If left unspecified, it will be tuned automatically.
-        num_units: Int or kerastuner.engine.hyperparameters.Choice.
+        num_units: Int or keras_tuner.engine.hyperparameters.Choice.
             The number of units in each dense layer.
             If left unspecified, it will be tuned automatically.
         use_bn: Boolean. Whether to use BatchNormalization layers.
             If left unspecified, it will be tuned automatically.
-        dropout: Float or kerastuner.engine.hyperparameters.Choice.
+        dropout: Float or keras_tuner.engine.hyperparameters.Choice.
             The dropout rate for the layers.
             If left unspecified, it will be tuned automatically.
     """
@@ -102,19 +104,19 @@ class DenseBlock(block_module.Block):
         config = super().get_config()
         config.update(
             {
-                "num_layers": hyperparameters.serialize(self.num_layers),
-                "num_units": hyperparameters.serialize(self.num_units),
+                "num_layers": io_utils.serialize_block_arg(self.num_layers),
+                "num_units": io_utils.serialize_block_arg(self.num_units),
                 "use_batchnorm": self.use_batchnorm,
-                "dropout": hyperparameters.serialize(self.dropout),
+                "dropout": io_utils.serialize_block_arg(self.dropout),
             }
         )
         return config
 
     @classmethod
     def from_config(cls, config):
-        config["num_layers"] = hyperparameters.deserialize(config["num_layers"])
-        config["num_units"] = hyperparameters.deserialize(config["num_units"])
-        config["dropout"] = hyperparameters.deserialize(config["dropout"])
+        config["num_layers"] = io_utils.deserialize_block_arg(config["num_layers"])
+        config["num_units"] = io_utils.deserialize_block_arg(config["num_units"])
+        config["dropout"] = io_utils.deserialize_block_arg(config["dropout"])
         return cls(**config)
 
     def build(self, hp, inputs=None):
@@ -147,13 +149,13 @@ class RNNBlock(block_module.Block):
     # Arguments
         return_sequences: Boolean. Whether to return the last output in the
             output sequence, or the full sequence. Defaults to False.
-        bidirectional: Boolean or kerastuner.engine.hyperparameters.Boolean.
+        bidirectional: Boolean or keras_tuner.engine.hyperparameters.Boolean.
             Bidirectional RNN. If left unspecified, it will be
             tuned automatically.
-        num_layers: Int or kerastuner.engine.hyperparameters.Choice.
+        num_layers: Int or keras_tuner.engine.hyperparameters.Choice.
             The number of layers in RNN. If left unspecified, it will
             be tuned automatically.
-        layer_type: String or or kerastuner.engine.hyperparameters.Choice.
+        layer_type: String or or keras_tuner.engine.hyperparameters.Choice.
             'gru' or 'lstm'. If left unspecified, it will be tuned
             automatically.
     """
@@ -189,20 +191,20 @@ class RNNBlock(block_module.Block):
         config.update(
             {
                 "return_sequences": self.return_sequences,
-                "bidirectional": hyperparameters.serialize(self.bidirectional),
-                "num_layers": hyperparameters.serialize(self.num_layers),
-                "layer_type": hyperparameters.serialize(self.layer_type),
+                "bidirectional": io_utils.serialize_block_arg(self.bidirectional),
+                "num_layers": io_utils.serialize_block_arg(self.num_layers),
+                "layer_type": io_utils.serialize_block_arg(self.layer_type),
             }
         )
         return config
 
     @classmethod
     def from_config(cls, config):
-        config["bidirectional"] = hyperparameters.deserialize(
+        config["bidirectional"] = io_utils.deserialize_block_arg(
             config["bidirectional"]
         )
-        config["num_layers"] = hyperparameters.deserialize(config["num_layers"])
-        config["layer_type"] = hyperparameters.deserialize(config["layer_type"])
+        config["num_layers"] = io_utils.deserialize_block_arg(config["num_layers"])
+        config["layer_type"] = io_utils.deserialize_block_arg(config["layer_type"])
         return cls(**config)
 
     def build(self, hp, inputs=None):
@@ -244,26 +246,27 @@ class ConvBlock(block_module.Block):
     """Block for vanilla ConvNets.
 
     # Arguments
-        kernel_size: Int or kerastuner.engine.hyperparameters.Choice.
+        kernel_size: Int or keras_tuner.engine.hyperparameters.Choice.
             The size of the kernel.
             If left unspecified, it will be tuned automatically.
-        num_blocks: Int or kerastuner.engine.hyperparameters.Choice.
+        num_blocks: Int or keras_tuner.engine.hyperparameters.Choice.
             The number of conv blocks, each of which may contain
             convolutional, max pooling, dropout, and activation. If left unspecified,
             it will be tuned automatically.
         num_layers: Int or hyperparameters.Choice.
             The number of convolutional layers in each block. If left
             unspecified, it will be tuned automatically.
-        filters: Int or kerastuner.engine.hyperparameters.Choice. The number of
+        filters: Int or keras_tuner.engine.hyperparameters.Choice. The number of
             filters in the convolutional layers. If left unspecified, it will
             be tuned automatically.
         max_pooling: Boolean. Whether to use max pooling layer in each block. If left
             unspecified, it will be tuned automatically.
         separable: Boolean. Whether to use separable conv layers.
             If left unspecified, it will be tuned automatically.
-        dropout: Float. Between 0 and 1. The dropout rate for after the
-            convolutional layers. If left unspecified, it will be tuned
-            automatically.
+        dropout: Float or kerastuner.engine.hyperparameters.
+            Choice range Between 0 and 1.
+            The dropout rate after convolutional layers.
+            If left unspecified, it will be tuned automatically.
     """
 
     def __init__(
@@ -274,7 +277,7 @@ class ConvBlock(block_module.Block):
         filters: Optional[Union[int, hyperparameters.Choice]] = None,
         max_pooling: Optional[bool] = None,
         separable: Optional[bool] = None,
-        dropout: Optional[float] = None,
+        dropout: Optional[Union[float, hyperparameters.Choice]] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -302,29 +305,34 @@ class ConvBlock(block_module.Block):
         )
         self.max_pooling = max_pooling
         self.separable = separable
-        self.dropout = dropout
+        self.dropout = utils.get_hyperparameter(
+            dropout,
+            hyperparameters.Choice("dropout", [0.0, 0.25, 0.5], default=0.0),
+            float,
+        )
 
     def get_config(self):
         config = super().get_config()
         config.update(
             {
-                "kernel_size": hyperparameters.serialize(self.kernel_size),
-                "num_blocks": hyperparameters.serialize(self.num_blocks),
-                "num_layers": hyperparameters.serialize(self.num_layers),
-                "filters": hyperparameters.serialize(self.filters),
+                "kernel_size": io_utils.serialize_block_arg(self.kernel_size),
+                "num_blocks": io_utils.serialize_block_arg(self.num_blocks),
+                "num_layers": io_utils.serialize_block_arg(self.num_layers),
+                "filters": io_utils.serialize_block_arg(self.filters),
                 "max_pooling": self.max_pooling,
                 "separable": self.separable,
-                "dropout": self.dropout,
+                "dropout": io_utils.serialize_block_arg(self.dropout),
             }
         )
         return config
 
     @classmethod
     def from_config(cls, config):
-        config["kernel_size"] = hyperparameters.deserialize(config["kernel_size"])
-        config["num_blocks"] = hyperparameters.deserialize(config["num_blocks"])
-        config["num_layers"] = hyperparameters.deserialize(config["num_layers"])
-        config["filters"] = hyperparameters.deserialize(config["filters"])
+        config["kernel_size"] = io_utils.deserialize_block_arg(config["kernel_size"])
+        config["num_blocks"] = io_utils.deserialize_block_arg(config["num_blocks"])
+        config["num_layers"] = io_utils.deserialize_block_arg(config["num_layers"])
+        config["filters"] = io_utils.deserialize_block_arg(config["filters"])
+        config["dropout"] = io_utils.deserialize_block_arg(config["dropout"])
         return cls(**config)
 
     def build(self, hp, inputs=None):
@@ -349,11 +357,6 @@ class ConvBlock(block_module.Block):
             max_pooling = hp.Boolean("max_pooling", default=True)
         pool = layer_utils.get_max_pooling(input_node.shape)
 
-        if self.dropout is not None:
-            dropout = self.dropout
-        else:
-            dropout = hp.Choice("dropout", [0.0, 0.25, 0.5], default=0)
-
         for i in range(utils.add_to_hp(self.num_blocks, hp)):
             for j in range(utils.add_to_hp(self.num_layers, hp)):
                 output_node = conv(
@@ -369,8 +372,10 @@ class ConvBlock(block_module.Block):
                     kernel_size - 1,
                     padding=self._get_padding(kernel_size - 1, output_node),
                 )(output_node)
-            if dropout > 0:
-                output_node = layers.Dropout(dropout)(output_node)
+            if utils.add_to_hp(self.dropout, hp) > 0:
+                output_node = layers.Dropout(utils.add_to_hp(self.dropout, hp))(
+                    output_node
+                )
         return output_node
 
     @staticmethod
@@ -487,20 +492,20 @@ class Transformer(block_module.Block):
     # Arguments
         max_features: Int. Size of the vocabulary. Must be set if not using
             TextToIntSequence before this block. Defaults to 20001.
-        pretraining: String or kerastuner.engine.hyperparameters.Choice.
+        pretraining: String or keras_tuner.engine.hyperparameters.Choice.
             'random' (use random weights instead any pretrained
             model), 'glove', 'fasttext' or 'word2vec'. Use pretrained word embedding.
             If left unspecified, it will be tuned automatically.
-        embedding_dim: Int or kerastuner.engine.hyperparameters.Choice.
+        embedding_dim: Int or keras_tuner.engine.hyperparameters.Choice.
             Output dimension of the Attention block.
             If left unspecified, it will be tuned automatically.
-        num_heads: Int or kerastuner.engine.hyperparameters.Choice.
+        num_heads: Int or keras_tuner.engine.hyperparameters.Choice.
             The number of attention heads. If left unspecified,
             it will be tuned automatically.
-        dense_dim: Int or kerastuner.engine.hyperparameters.Choice.
+        dense_dim: Int or keras_tuner.engine.hyperparameters.Choice.
             The output dimension of the Feed-Forward Network. If left
             unspecified, it will be tuned automatically.
-        dropout: Float or kerastuner.engine.hyperparameters.Choice.
+        dropout: Float or keras_tuner.engine.hyperparameters.Choice.
             Between 0 and 1. If left unspecified, it will be
             tuned automatically.
     """
@@ -556,24 +561,24 @@ class Transformer(block_module.Block):
         config.update(
             {
                 "max_features": self.max_features,
-                "pretraining": hyperparameters.serialize(self.pretraining),
-                "embedding_dim": hyperparameters.serialize(self.embedding_dim),
-                "num_heads": hyperparameters.serialize(self.num_heads),
-                "dense_dim": hyperparameters.serialize(self.dense_dim),
-                "dropout": hyperparameters.serialize(self.dropout),
+                "pretraining": io_utils.serialize_block_arg(self.pretraining),
+                "embedding_dim": io_utils.serialize_block_arg(self.embedding_dim),
+                "num_heads": io_utils.serialize_block_arg(self.num_heads),
+                "dense_dim": io_utils.serialize_block_arg(self.dense_dim),
+                "dropout": io_utils.serialize_block_arg(self.dropout),
             }
         )
         return config
 
     @classmethod
     def from_config(cls, config):
-        config["pretraining"] = hyperparameters.deserialize(config["pretraining"])
-        config["embedding_dim"] = hyperparameters.deserialize(
+        config["pretraining"] = io_utils.deserialize_block_arg(config["pretraining"])
+        config["embedding_dim"] = io_utils.deserialize_block_arg(
             config["embedding_dim"]
         )
-        config["num_heads"] = hyperparameters.deserialize(config["num_heads"])
-        config["dense_dim"] = hyperparameters.deserialize(config["dense_dim"])
-        config["dropout"] = hyperparameters.deserialize(config["dropout"])
+        config["num_heads"] = io_utils.deserialize_block_arg(config["num_heads"])
+        config["dense_dim"] = io_utils.deserialize_block_arg(config["dense_dim"])
+        config["dropout"] = io_utils.deserialize_block_arg(config["dropout"])
         return cls(**config)
 
     def build(self, hp, inputs=None):
@@ -594,7 +599,7 @@ class Transformer(block_module.Block):
         dense_dim = utils.add_to_hp(self.dense_dim, hp)
         dropout = utils.add_to_hp(self.dropout, hp)
 
-        ffn = tf.keras.Sequential(
+        ffn = keras.Sequential(
             [
                 layers.Dense(dense_dim, activation="relu"),
                 layers.Dense(embedding_dim),
@@ -622,16 +627,16 @@ class Transformer(block_module.Block):
             embedding_dim=embedding_dim,
             dropout=dropout,
         ).build(hp, positions)
-        output_node = tf.keras.layers.Add()([token_embedding, position_embedding])
+        output_node = keras.layers.Add()([token_embedding, position_embedding])
         attn_output = MultiHeadSelfAttention(embedding_dim, num_heads).build(
             hp, output_node
         )
         attn_output = dropout1(attn_output)
-        add_inputs_1 = tf.keras.layers.Add()([output_node, attn_output])
+        add_inputs_1 = keras.layers.Add()([output_node, attn_output])
         out1 = layernorm1(add_inputs_1)
         ffn_output = ffn(out1)
         ffn_output = dropout2(ffn_output)
-        add_inputs_2 = tf.keras.layers.Add()([out1, ffn_output])
+        add_inputs_2 = keras.layers.Add()([out1, ffn_output])
         return layernorm2(add_inputs_2)
 
     @staticmethod
@@ -686,7 +691,7 @@ class KerasApplicationBlock(block_module.Block):
         if hp.Boolean("imagenet_size", default=False):
             min_size = 224
         if input_node.shape[1] < min_size or input_node.shape[2] < min_size:
-            input_node = layers.experimental.preprocessing.Resizing(
+            input_node = layers.Resizing(
                 max(min_size, input_node.shape[1]),
                 max(min_size, input_node.shape[2]),
             )(input_node)
@@ -749,7 +754,8 @@ class XceptionBlock(KerasApplicationBlock):
 
     An Xception structure, used for specifying your model with specific datasets.
 
-    The original Xception architecture is from https://arxiv.org/abs/1610.02357.
+    The original Xception architecture is from
+    [https://arxiv.org/abs/1610.02357](https://arxiv.org/abs/1610.02357).
     The data first goes through the entry flow, then through the middle flow which
     is repeated eight times, and finally through the exit flow.
 
@@ -818,14 +824,14 @@ class Embedding(block_module.Block):
     # Arguments
         max_features: Int. Size of the vocabulary. Must be set if not using
             TextToIntSequence before this block. Defaults to 20001.
-        pretraining: String or kerastuner.engine.hyperparameters.Choice.
+        pretraining: String or keras_tuner.engine.hyperparameters.Choice.
             'random' (use random weights instead any pretrained
             model), 'glove', 'fasttext' or 'word2vec'. Use pretrained word embedding.
             If left unspecified, it will be tuned automatically.
-        embedding_dim: Int or kerastuner.engine.hyperparameters.Choice.
+        embedding_dim: Int or keras_tuner.engine.hyperparameters.Choice.
             Output dimension of the Attention block.
             If left unspecified, it will be tuned automatically.
-        dropout: Float or kerastuner.engine.hyperparameters.Choice.
+        dropout: Float or keras_tuner.engine.hyperparameters.Choice.
             The dropout rate for the layers.
             If left unspecified, it will be tuned automatically.
     """
@@ -867,18 +873,18 @@ class Embedding(block_module.Block):
         config.update(
             {
                 "max_features": self.max_features,
-                "pretraining": hyperparameters.serialize(self.pretraining),
-                "embedding_dim": hyperparameters.serialize(self.embedding_dim),
-                "dropout": hyperparameters.serialize(self.dropout),
+                "pretraining": io_utils.serialize_block_arg(self.pretraining),
+                "embedding_dim": io_utils.serialize_block_arg(self.embedding_dim),
+                "dropout": io_utils.serialize_block_arg(self.dropout),
             }
         )
         return config
 
     @classmethod
     def from_config(cls, config):
-        config["pretraining"] = hyperparameters.deserialize(config["pretraining"])
-        config["dropout"] = hyperparameters.deserialize(config["dropout"])
-        config["embedding_dim"] = hyperparameters.deserialize(
+        config["pretraining"] = io_utils.deserialize_block_arg(config["pretraining"])
+        config["dropout"] = io_utils.deserialize_block_arg(config["dropout"])
+        config["embedding_dim"] = io_utils.deserialize_block_arg(
             config["embedding_dim"]
         )
         return cls(**config)
@@ -929,7 +935,7 @@ class BertBlock(block_module.Block):
         clf = ak.AutoModel(inputs=input_node, outputs=output_node, max_trials=10)
     ```
     # Arguments
-        max_sequence_length: Int or kerastuner.engine.hyperparameters.Choice.
+        max_sequence_length: Int or keras_tuner.engine.hyperparameters.Choice.
             The maximum length of a sequence that is used to train the model.
     """
 
@@ -951,7 +957,7 @@ class BertBlock(block_module.Block):
         config = super().get_config()
         config.update(
             {
-                "max_sequence_length": hyperparameters.serialize(
+                "max_sequence_length": io_utils.serialize_block_arg(
                     self.max_sequence_length
                 )
             }
@@ -960,7 +966,7 @@ class BertBlock(block_module.Block):
 
     @classmethod
     def from_config(cls, config):
-        config["max_sequence_length"] = hyperparameters.deserialize(
+        config["max_sequence_length"] = io_utils.deserialize_block_arg(
             config["max_sequence_length"]
         )
         return cls(**config)

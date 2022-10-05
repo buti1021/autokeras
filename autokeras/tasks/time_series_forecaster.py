@@ -85,7 +85,7 @@ class SupervisedTimeseriesDataPipeline(structured_data.BaseStructuredDataPipelin
             y_val = y_val[self.lookback - 1 :]
             validation_data = x_val, y_val
 
-        super().fit(
+        history = super().fit(
             x=x[: self.train_len],
             y=y[self.lookback - 1 :],
             epochs=epochs,
@@ -94,9 +94,15 @@ class SupervisedTimeseriesDataPipeline(structured_data.BaseStructuredDataPipelin
             validation_data=validation_data,
             **kwargs
         )
+        return history
 
     def predict(self, x, **kwargs):
         x = self.read_for_predict(x)
+        if len(x) < self.train_len:
+            raise ValueError(
+                "The prediction data requires the original training"
+                " data to make predictions on subsequent data points"
+            )
         y_pred = super().predict(x=x, **kwargs)
         lower_bound = self.train_len + self.predict_from
         if self.predict_until is None:

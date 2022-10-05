@@ -20,7 +20,8 @@ from typing import Union
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.util import nest
+from tensorflow import keras
+from tensorflow import nest
 
 from autokeras import blocks
 from autokeras import graph as graph_module
@@ -111,7 +112,7 @@ class AutoModel(object):
         seed: Int. Random seed.
         max_model_size: Int. Maximum number of scalars in the parameters of a
             model. Models larger than this are rejected.
-        **kwargs: Any arguments supported by kerastuner.Tuner.
+        **kwargs: Any arguments supported by keras_tuner.Tuner.
     """
 
     def __init__(
@@ -193,8 +194,15 @@ class AutoModel(object):
             graph = graph_module.Graph(inputs=self.inputs, outputs=self.outputs)
         # Using input/output API.
         elif all([isinstance(output, head_module.Head) for output in self.outputs]):
+            # Clear session to reset get_uid(). The names of the blocks will
+            # start to count from 1 for new blocks in a new AutoModel afterwards.
+            # When initializing multiple AutoModel with Task API, if not
+            # counting from 1 for each of the AutoModel, the predefined hp
+            # values in task specifiec tuners would not match the names.
+            keras.backend.clear_session()
             graph = self._assemble()
             self.outputs = graph.outputs
+            keras.backend.clear_session()
 
         return graph
 
@@ -207,6 +215,7 @@ class AutoModel(object):
         callbacks=None,
         validation_split=0.2,
         validation_data=None,
+        verbose=1,
         **kwargs
     ):
         """Search for the best model and hyperparameters for the AutoModel.
@@ -243,8 +252,20 @@ class AutoModel(object):
                 validation data should be the same as the training data.
                 The best model found would be fit on the training dataset without the
                 validation data.
+            verbose: 0, 1, or 2. Verbosity mode. 0 = silent, 1 = progress bar,
+                2 = one line per epoch. Note that the progress bar is not
+                particularly useful when logged to a file, so verbose=2 is
+                recommended when not running interactively (eg, in a production
+                environment). Controls the verbosity of both KerasTuner search and
+                [keras.Model.fit](https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit)
             **kwargs: Any arguments supported by
                 [keras.Model.fit](https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit).
+
+        # Returns
+            history: A Keras History object corresponding to the best model.
+                Its History.history attribute is a record of training
+                loss values and metrics values at successive epochs, as well as
+                validation loss values and validation metrics values (if applicable).
         """
         # Check validation information.
         if not validation_data and not validation_split:
@@ -268,14 +289,17 @@ class AutoModel(object):
                 dataset, validation_split
             )
 
-        self.tuner.search(
+        history = self.tuner.search(
             x=dataset,
             epochs=epochs,
             callbacks=callbacks,
             validation_data=validation_data,
             validation_split=validation_split,
+            verbose=verbose,
             **kwargs
         )
+
+        return history
 
     def _adapt(self, dataset, hms, batch_size):
         if isinstance(dataset, tf.data.Dataset):
@@ -359,6 +383,7 @@ class AutoModel(object):
             inputs=[node.get_hyper_preprocessors() for node in self.inputs],
             outputs=[head.get_hyper_preprocessors() for head in self._heads],
         )
+        self.tuner.hypermodel.hyper_pipeline = self.tuner.hyper_pipeline
 
     def _convert_to_dataset(self, x, y, validation_data, batch_size):
         """Convert the data to tf.data.Dataset."""
@@ -403,11 +428,16 @@ class AutoModel(object):
         # It matches the single IO case.
         return len(shapes) == 2 and len(self.inputs) == 1 and len(self.outputs) == 1
 
-    def predict(self, x, batch_size=32, **kwargs):
+    def predict(self, x, batch_size=32, verbose=1, **kwargs):
         """Predict the output for a given testing data.
 
         # Arguments
             x: Any allowed types according to the input node. Testing data.
+            batch_size: Number of samples per batch.
+                If unspecified, batch_size will default to 32.
+            verbose: Verbosity mode. 0 = silent, 1 = progress bar.
+                Controls the verbosity of
+                [keras.Model.predict](https://tensorflow.org/api_docs/python/tf/keras/Model#predict)
             **kwargs: Any arguments supported by keras.Model.predict.
 
         # Returns
@@ -424,17 +454,22 @@ class AutoModel(object):
         dataset = tf.data.Dataset.zip((dataset, dataset))
         y = model.predict(dataset, **kwargs)
         y = utils.predict_with_adaptive_batch_size(
-            model=model, batch_size=batch_size, x=dataset, **kwargs
+            model=model, batch_size=batch_size, x=dataset, verbose=verbose, **kwargs
         )
         return pipeline.postprocess(y)
 
-    def evaluate(self, x, y=None, batch_size=32, **kwargs):
+    def evaluate(self, x, y=None, batch_size=32, verbose=1, **kwargs):
         """Evaluate the best model for the given data.
 
         # Arguments
             x: Any allowed types according to the input node. Testing data.
             y: Any allowed types according to the head. Testing targets.
                 Defaults to None.
+            batch_size: Number of samples per batch.
+                If unspecified, batch_size will default to 32.
+            verbose: Verbosity mode. 0 = silent, 1 = progress bar.
+                Controls the verbosity of
+                [keras.Model.evaluate](http://tensorflow.org/api_docs/python/tf/keras/Model#evaluate)
             **kwargs: Any arguments supported by keras.Model.evaluate.
 
         # Returns
@@ -455,14 +490,14 @@ class AutoModel(object):
         dataset = pipeline.transform(dataset)
         model = self.tuner.get_best_model()
         return utils.evaluate_with_adaptive_batch_size(
-            model=model, batch_size=batch_size, x=dataset, **kwargs
+            model=model, batch_size=batch_size, x=dataset, verbose=verbose, **kwargs
         )
 
     def export_model(self):
         """Export the best Keras Model.
 
         # Returns
-            tf.keras.Model instance. The best model found during the search, loaded
+            keras.Model instance. The best model found during the search, loaded
             with trained weights.
         """
         return self.tuner.get_best_model()

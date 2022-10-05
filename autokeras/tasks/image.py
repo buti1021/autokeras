@@ -20,6 +20,7 @@ from typing import Type
 from typing import Union
 
 import tensorflow as tf
+from tensorflow import keras
 
 from autokeras import auto_model
 from autokeras import blocks
@@ -109,7 +110,7 @@ class ImageClassifier(SupervisedImagePipeline):
         x: Optional[types.DatasetType] = None,
         y: Optional[types.DatasetType] = None,
         epochs: Optional[int] = None,
-        callbacks: Optional[List[tf.keras.callbacks.Callback]] = None,
+        callbacks: Optional[List[keras.callbacks.Callback]] = None,
         validation_split: Optional[float] = 0.2,
         validation_data: Union[
             tf.data.Dataset, Tuple[types.DatasetType, types.DatasetType], None
@@ -155,8 +156,13 @@ class ImageClassifier(SupervisedImagePipeline):
                 validation data.
             **kwargs: Any arguments supported by
                 [keras.Model.fit](https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit).
+        # Returns
+            history: A Keras History object corresponding to the best model.
+                Its History.history attribute is a record of training
+                loss values and metrics values at successive epochs, as well as
+                validation loss values and validation metrics values (if applicable).
         """
-        super().fit(
+        history = super().fit(
             x=x,
             y=y,
             epochs=epochs,
@@ -165,6 +171,7 @@ class ImageClassifier(SupervisedImagePipeline):
             validation_data=validation_data,
             **kwargs
         )
+        return history
 
 
 class ImageRegressor(SupervisedImagePipeline):
@@ -235,7 +242,7 @@ class ImageRegressor(SupervisedImagePipeline):
         x: Optional[types.DatasetType] = None,
         y: Optional[types.DatasetType] = None,
         epochs: Optional[int] = None,
-        callbacks: Optional[List[tf.keras.callbacks.Callback]] = None,
+        callbacks: Optional[List[keras.callbacks.Callback]] = None,
         validation_split: Optional[float] = 0.2,
         validation_data: Union[
             types.DatasetType, Tuple[types.DatasetType], None
@@ -282,8 +289,13 @@ class ImageRegressor(SupervisedImagePipeline):
                 validation data.
             **kwargs: Any arguments supported by
                 [keras.Model.fit](https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit).
+        # Returns
+            history: A Keras History object corresponding to the best model.
+                Its History.history attribute is a record of training
+                loss values and metrics values at successive epochs, as well as
+                validation loss values and validation metrics values (if applicable).
         """
-        super().fit(
+        history = super().fit(
             x=x,
             y=y,
             epochs=epochs,
@@ -292,6 +304,7 @@ class ImageRegressor(SupervisedImagePipeline):
             validation_data=validation_data,
             **kwargs
         )
+        return history
 
 
 class ImageSegmenter(SupervisedImagePipeline):
@@ -359,7 +372,7 @@ class ImageSegmenter(SupervisedImagePipeline):
         x: Optional[types.DatasetType] = None,
         y: Optional[types.DatasetType] = None,
         epochs: Optional[int] = None,
-        callbacks: Optional[List[tf.keras.callbacks.Callback]] = None,
+        callbacks: Optional[List[keras.callbacks.Callback]] = None,
         validation_split: Optional[float] = 0.2,
         validation_data: Union[
             types.DatasetType, Tuple[types.DatasetType], None
@@ -406,8 +419,13 @@ class ImageSegmenter(SupervisedImagePipeline):
                 validation data.
             **kwargs: Any arguments supported by
                 [keras.Model.fit](https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit).
+        # Returns
+            history: A Keras History object corresponding to the best model.
+                Its History.history attribute is a record of training
+                loss values and metrics values at successive epochs, as well as
+                validation loss values and validation metrics values (if applicable).
         """
-        super().fit(
+        history = super().fit(
             x=x,
             y=y,
             epochs=epochs,
@@ -416,6 +434,7 @@ class ImageSegmenter(SupervisedImagePipeline):
             validation_data=validation_data,
             **kwargs
         )
+        return history
 
 
 class ImageObjectDetector(SupervisedImagePipeline):
@@ -474,7 +493,7 @@ class ImageObjectDetector(SupervisedImagePipeline):
         x: Optional[types.DatasetType] = None,
         y: Optional[types.DatasetType] = None,
         epochs: Optional[int] = None,
-        callbacks: Optional[List[tf.keras.callbacks.Callback]] = None,
+        callbacks: Optional[List[keras.callbacks.Callback]] = None,
         validation_split: Optional[float] = 0.2,
         validation_data: Union[
             tf.data.Dataset, Tuple[types.DatasetType, types.DatasetType], None
